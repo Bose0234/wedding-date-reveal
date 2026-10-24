@@ -2042,11 +2042,11 @@ function startWeddingAnimation() {
   scheduleAnimation(revealGallery, CURTAIN_DURATION + INTRO_DURATION);
 
   // Stop the animation effects later, but never hide the final date screen.
-  scheduleAnimation(() => {
-    stopFireworks();
-    stopFlowers();
-    animationRunning = false;
-  }, TOTAL_DURATION);
+  // scheduleAnimation(() => {
+  //   stopFireworks();
+  //   stopFlowers();
+  //   animationRunning = false;
+  // }, TOTAL_DURATION);
 }
 
 /* Start only after the visitor clicks */
