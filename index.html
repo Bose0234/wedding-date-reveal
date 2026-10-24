@@ -1427,6 +1427,129 @@ html, body {
   }
 }
 
+
+/* ================================
+   Wedding Photo Gallery
+================================ */
+
+.photo-gallery {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 2vh, 22px);
+  padding: 24px;
+  overflow: auto;
+  background:
+    radial-gradient(ellipse at center, #fffdf7 0%, #fff0e8 65%, #f5d5c8 100%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.75s ease, visibility 0.75s ease;
+}
+
+.photo-gallery.is-active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.photo-gallery.is-leaving {
+  opacity: 0;
+  visibility: visible;
+  pointer-events: none;
+}
+
+.gallery-heading {
+  flex-shrink: 0;
+  text-align: center;
+  color: #8d1831;
+}
+
+.gallery-heading p {
+  margin: 0 0 6px;
+  font-size: 10px;
+  letter-spacing: 4px;
+}
+
+.gallery-heading h2 {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: clamp(26px, 4vw, 44px);
+  font-weight: normal;
+}
+
+.gallery-heading span {
+  display: block;
+  margin-top: 7px;
+  color: #76535a;
+  font-size: 12px;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: clamp(4px, 0.8vw, 10px);
+  width: min(100%, 1000px);
+}
+
+.gallery-tile {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 5px;
+  background: #ead3c9;
+  box-shadow: 0 3px 10px rgba(100, 35, 45, 0.12);
+  opacity: 0;
+  transform: scale(0.78) translateY(8px);
+  transition:
+    opacity 280ms ease,
+    transform 280ms ease;
+}
+
+.gallery-tile.is-visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.gallery-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 600px) {
+  .photo-gallery {
+    gap: 14px;
+    padding: 18px 10px;
+  }
+
+  .gallery-heading p {
+    font-size: 8px;
+    letter-spacing: 3px;
+  }
+
+  .gallery-heading span {
+    font-size: 10px;
+  }
+
+  .gallery-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  .gallery-tile {
+    border-width: 1px;
+    border-radius: 2px;
+  }
+}
+
+
   </style>
 </head>
 <body>
@@ -1440,6 +1563,16 @@ html, body {
   <span class="start-subtitle">A beautiful beginning awaits</span>
 </button>
     <div class="stage">
+      <!-- Wedding Photo Gallery -->
+<section id="photoGallery" class="photo-gallery" aria-label="Wedding photo gallery">
+  <div class="gallery-heading">
+    <p>OUR MEMORIES</p>
+    <h2>A Journey of Love</h2>
+    <span>Every picture tells a little story.</span>
+  </div>
+
+  <div class="gallery-grid" id="galleryGrid"></div>
+</section>
         <canvas id="welcome-flowers" aria-hidden="true"></canvas>
       <div class="spotlight"></div>
 
@@ -1493,6 +1626,128 @@ html, body {
 
 const theater = document.getElementById("theater");
 const canvas = document.getElementById("fireworks");
+
+/* ================================
+   Wedding Photo Gallery
+================================ */
+
+const photoGallery = document.getElementById("photoGallery");
+const galleryGrid = document.getElementById("galleryGrid");
+
+const GALLERY_MIN_DURATION = 5200;
+const GALLERY_MAX_DURATION = 7000;
+const GALLERY_POPUP_DURATION = 280;
+const GALLERY_EXIT_DURATION = 750;
+
+let galleryStarted = false;
+let dateHasStarted = false;
+let galleryTimer = null;
+
+const galleryImages = Array.from({ length: 64 }, (_, index) => {
+  const number = String(index + 1).padStart(2, "0");
+
+  return `./Assets/gallery/photo-${number}.jpg`;
+});
+
+/* Create the 64 gallery tiles once */
+
+const galleryTiles = galleryImages.map((src, index) => {
+  const tile = document.createElement("div");
+  tile.className = "gallery-tile";
+
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = `Wedding memory ${index + 1}`;
+  img.loading = "eager";
+  img.decoding = "async";
+
+  tile.appendChild(img);
+  galleryGrid.appendChild(tile);
+
+  return { tile, img };
+});
+
+/* Preload and decode the gallery photos */
+
+async function preloadGalleryImages() {
+  await Promise.all(
+    galleryTiles.map(async ({ img }) => {
+      try {
+        if (!img.complete) {
+          await new Promise((resolve) => {
+            img.addEventListener("load", resolve, { once: true });
+            img.addEventListener("error", resolve, { once: true });
+          });
+        }
+
+        if (img.naturalWidth > 0 && img.decode) {
+          await img.decode().catch(() => {});
+        }
+      } catch (error) {
+        console.warn("Could not load gallery image:", img.src);
+      }
+    })
+  );
+}
+
+/* Reveal tiles one after another */
+
+async function revealGallery() {
+  if (galleryStarted || dateHasStarted) return;
+
+  galleryStarted = true;
+  photoGallery.classList.add("is-active");
+
+  await preloadGalleryImages();
+
+  if (dateHasStarted) return;
+
+  const staggerInterval = 65;
+
+  galleryTiles.forEach(({ tile }, index) => {
+    setTimeout(() => {
+      if (!dateHasStarted) {
+        tile.classList.add("is-visible");
+      }
+    }, index * staggerInterval);
+  });
+
+  const revealDuration =
+    (galleryTiles.length - 1) * staggerInterval +
+    GALLERY_POPUP_DURATION;
+
+  const galleryDuration = Math.max(
+    GALLERY_MIN_DURATION,
+    Math.min(GALLERY_MAX_DURATION, revealDuration + 500)
+  );
+
+  galleryTimer = setTimeout(showDateReveal, galleryDuration);
+}
+
+/* Fade the gallery out, then show the existing date reveal */
+
+function showDateReveal() {
+  if (dateHasStarted) return;
+
+  dateHasStarted = true;
+  clearTimeout(galleryTimer);
+
+  photoGallery.classList.remove("is-active");
+  photoGallery.classList.add("is-leaving");
+
+  setTimeout(() => {
+    theater.classList.add("date-mode");
+
+    if (typeof startFireworks === "function") {
+      startFireworks();
+    }
+
+    if (typeof startFlowerSprinkle === "function") {
+      startFlowerSprinkle();
+    }
+  }, GALLERY_EXIT_DURATION);
+}
+
 const ctx = canvas.getContext("2d");
 const bgMusic = document.getElementById("bgMusic");
 const startButton = document.getElementById("startWedding");
