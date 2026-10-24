@@ -1451,8 +1451,8 @@ html, body {
    Put the 8×8 grid on the element that actually contains the tiles. */
 .gallery-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: repeat(3, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(0, 1fr));
     width: 100%;
     height: 100%;
     gap: 3px;
@@ -1496,7 +1496,8 @@ html, body {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #ead3c9;
 }
 
 @media (max-width: 600px) {
@@ -1510,8 +1511,8 @@ html, body {
   }
 
   .gallery-grid {
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(5, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(5, minmax(0, 1fr));
   }
 }
 
@@ -1611,7 +1612,8 @@ const galleryGrid = document.getElementById("galleryGrid");
 
 const CURTAIN_DURATION = 4500;
 const INTRO_DURATION = 4500;
-const GALLERY_POPUP_DURATION = 350;
+const GALLERY_STAGGER_INTERVAL = 800; // Average pacing reference; reveal delays are randomized below.
+const GALLERY_POPUP_DURATION = 600;
 const GALLERY_HOLD_AFTER_REVEAL = 6500;
 const GALLERY_EXIT_DURATION = 650;
 const TOTAL_DURATION = 30000;
@@ -1620,11 +1622,10 @@ let galleryStarted = false;
 let dateHasStarted = false;
 let galleryTimer = null;
 let galleryRevealTimers = [];
-let galleryRunId = 0;
 
 const galleryImages = Array.from({ length: 15 }, (_, index) => {
-  const number = String(index + 1).padStart(2, "0");
-  return `/gallery/photo-${number}.jpg`;
+    const number = String(index + 1).padStart(2, "0");
+    return `/gallery/photo-${number}.jpg`;
 });
 
 const galleryTiles = galleryImages.map((src, index) => {
@@ -1635,105 +1636,75 @@ const galleryTiles = galleryImages.map((src, index) => {
   img.alt = `Wedding memory ${index + 1}`;
   img.loading = "eager";
   img.decoding = "async";
-  img.fetchPriority = index < 3 ? "high" : "auto";
   tile.appendChild(img);
   galleryGrid.appendChild(tile);
-  return { tile, img, src, index };
+  return { tile, img };
 });
 
-// Resolve when an image is actually ready, rather than assuming assigning src means it loaded.
-function waitForImage(item) {
-  const { img } = item;
-  if (img.complete) {
-    return Promise.resolve(img.naturalWidth > 0);
-  }
-
-  return new Promise(resolve => {
-    let settled = false;
-    const finish = loaded => {
-      if (settled) return;
-      settled = true;
-      img.removeEventListener("load", onLoad);
-      img.removeEventListener("error", onError);
-      clearTimeout(timeout);
-      resolve(loaded);
-    };
-    const onLoad = () => finish(img.naturalWidth > 0);
-    const onError = () => {
-      console.error(`Gallery image failed to load: ${item.src}`);
-      finish(false);
-    };
-    const timeout = setTimeout(() => finish(img.naturalWidth > 0), 12000);
-    img.addEventListener("load", onLoad, { once: true });
-    img.addEventListener("error", onError, { once: true });
-  }).then(async loaded => {
-    if (loaded && typeof img.decode === "function") {
-      try { await img.decode(); } catch (_) { /* The loaded image can still render. */ }
+// Start fetching all photos early; image loading never blocks the timeline.
+function preloadGalleryImages() {
+  galleryTiles.forEach(({ img }) => {
+    if (img.complete && img.naturalWidth > 0 && img.decode) {
+      img.decode().catch(() => {});
     }
-    return loaded;
   });
 }
 
-function randomPause() {
-  // Irregular reveal pacing. The visual transition itself stays at 350ms.
-  return 650 + Math.random() * 900 + (Math.random() < 0.25 ? 500 + Math.random() * 700 : 0);
-}
-
-function shuffle(items) {
-  const result = items.slice();
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
-}
-
-async function revealGallery() {
+function revealGallery() {
   if (galleryStarted || dateHasStarted) return;
   galleryStarted = true;
-  const thisRun = ++galleryRunId;
   photoGallery.classList.remove("is-leaving");
   photoGallery.classList.add("is-active");
+  preloadGalleryImages();
 
-  // Shuffle every tile, including the first one, so both image order and reveal order vary.
-  const randomizedOrder = shuffle(galleryTiles);
-  let revealedCount = 0;
+  // Reveal the first photo first, then shuffle the remaining photo positions.
+  // This keeps the opening intentional while making the rest feel spontaneous.
+  const revealOrder = galleryTiles.map((_, index) => index);
+  const remainingIndexes = revealOrder.slice(1);
 
-  for (let orderIndex = 0; orderIndex < randomizedOrder.length; orderIndex++) {
-    if (dateHasStarted || thisRun !== galleryRunId) return;
-
-    const item = randomizedOrder[orderIndex];
-    await waitForImage(item);
-    if (dateHasStarted || thisRun !== galleryRunId) return;
-
-    // The tile appears only after its image has loaded (or failed, so one bad file cannot stall the show).
-    item.tile.classList.add("is-visible");
-    revealedCount++;
-
-    if (orderIndex < randomizedOrder.length - 1) {
-      await new Promise(resolve => {
-        const timer = setTimeout(resolve, randomPause());
-        galleryRevealTimers.push(timer);
-      });
-    }
+  for (let i = remainingIndexes.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [remainingIndexes[i], remainingIndexes[j]] = [remainingIndexes[j], remainingIndexes[i]];
   }
 
-  if (revealedCount > 0 && !dateHasStarted && thisRun === galleryRunId) {
-    galleryTimer = setTimeout(showDateReveal, GALLERY_HOLD_AFTER_REVEAL);
-  } else if (!dateHasStarted && thisRun === galleryRunId) {
-    galleryTimer = setTimeout(showDateReveal, GALLERY_HOLD_AFTER_REVEAL);
-  }
+  const randomizedOrder = galleryTiles.length > 0
+    ? [0, ...remainingIndexes]
+    : [];
+  let lastRevealDelay = 0;
+
+  randomizedOrder.forEach((tileIndex, orderIndex) => {
+    // Slow, irregular pacing: each photo gets its own random pause.
+    // Some reveals pause longer to avoid a predictable rhythm.
+    const pause = 550 + Math.random() * 850 + (Math.random() < 0.22 ? 450 + Math.random() * 650 : 0);
+    const delay = orderIndex === 0 ? 0 : lastRevealDelay + pause;
+    lastRevealDelay = delay;
+
+    const timer = setTimeout(() => {
+      if (!dateHasStarted) {
+        galleryTiles[tileIndex].tile.classList.add("is-visible");
+      }
+    }, delay);
+
+    galleryRevealTimers.push(timer);
+  });
+
+  const revealDuration = lastRevealDelay + GALLERY_POPUP_DURATION;
+  galleryTimer = setTimeout(
+    showDateReveal,
+    revealDuration + GALLERY_HOLD_AFTER_REVEAL
+  );
 }
 
 function showDateReveal() {
   if (dateHasStarted) return;
   dateHasStarted = true;
-  galleryRunId++;
   clearTimeout(galleryTimer);
   galleryRevealTimers.forEach(clearTimeout);
   galleryRevealTimers = [];
 
-  // Hide the welcome scene before fading the gallery, preventing a flash underneath it.
+  // Hide the welcome scene BEFORE the gallery starts fading. The gallery
+  // remains above the stage during the fade, so date-mode can be activated
+  // immediately without exposing the welcome screen underneath it.
   theater.classList.add("date-mode");
   photoGallery.style.visibility = "visible";
   photoGallery.classList.remove("is-active");
