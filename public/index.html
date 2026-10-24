@@ -1451,8 +1451,8 @@ html, body {
    Put the 8×8 grid on the element that actually contains the tiles. */
 .gallery-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: repeat(3, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(0, 1fr));
     width: 100%;
     height: 100%;
     gap: 3px;
@@ -1496,7 +1496,8 @@ html, body {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #ead3c9;
 }
 
 @media (max-width: 600px) {
@@ -1504,7 +1505,15 @@ html, body {
     gap: 1px;
     padding: 1px;
   }
-  .gallery-tile { border-width: 0; border-radius: 0; }
+  .gallery-tile { 
+    border-width: 0; 
+    border-radius: 0; 
+  }
+
+  .gallery-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(5, minmax(0, 1fr));
+  }
 }
 
 
@@ -1603,9 +1612,9 @@ const galleryGrid = document.getElementById("galleryGrid");
 
 const CURTAIN_DURATION = 4500;
 const INTRO_DURATION = 4500;
-const GALLERY_STAGGER_INTERVAL = 50;
-const GALLERY_POPUP_DURATION = 350;
-const GALLERY_HOLD_AFTER_REVEAL = 8500;
+const GALLERY_STAGGER_INTERVAL = 800; // Average pacing reference; reveal delays are randomized below.
+const GALLERY_POPUP_DURATION = 600;
+const GALLERY_HOLD_AFTER_REVEAL = 6500;
 const GALLERY_EXIT_DURATION = 650;
 const TOTAL_DURATION = 30000;
 
@@ -1648,15 +1657,42 @@ function revealGallery() {
   photoGallery.classList.add("is-active");
   preloadGalleryImages();
 
-  galleryTiles.forEach(({ tile }, index) => {
+  // Reveal the first photo first, then shuffle the remaining photo positions.
+  // This keeps the opening intentional while making the rest feel spontaneous.
+  const revealOrder = galleryTiles.map((_, index) => index);
+  const remainingIndexes = revealOrder.slice(1);
+
+  for (let i = remainingIndexes.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [remainingIndexes[i], remainingIndexes[j]] = [remainingIndexes[j], remainingIndexes[i]];
+  }
+
+  const randomizedOrder = galleryTiles.length > 0
+    ? [0, ...remainingIndexes]
+    : [];
+  let lastRevealDelay = 0;
+
+  randomizedOrder.forEach((tileIndex, orderIndex) => {
+    // Slow, irregular pacing: each photo gets its own random pause.
+    // Some reveals pause longer to avoid a predictable rhythm.
+    const pause = 550 + Math.random() * 850 + (Math.random() < 0.22 ? 450 + Math.random() * 650 : 0);
+    const delay = orderIndex === 0 ? 0 : lastRevealDelay + pause;
+    lastRevealDelay = delay;
+
     const timer = setTimeout(() => {
-      if (!dateHasStarted) tile.classList.add("is-visible");
-    }, index * GALLERY_STAGGER_INTERVAL);
+      if (!dateHasStarted) {
+        galleryTiles[tileIndex].tile.classList.add("is-visible");
+      }
+    }, delay);
+
     galleryRevealTimers.push(timer);
   });
 
-  const revealDuration = (galleryTiles.length - 1) * GALLERY_STAGGER_INTERVAL + GALLERY_POPUP_DURATION;
-  galleryTimer = setTimeout(showDateReveal, revealDuration + GALLERY_HOLD_AFTER_REVEAL);
+  const revealDuration = lastRevealDelay + GALLERY_POPUP_DURATION;
+  galleryTimer = setTimeout(
+    showDateReveal,
+    revealDuration + GALLERY_HOLD_AFTER_REVEAL
+  );
 }
 
 function showDateReveal() {
