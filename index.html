@@ -1486,7 +1486,7 @@ html, body {
   box-shadow: 0 2px 7px rgba(100, 35, 45, 0.12);
   opacity: 0;
   transform: scale(0.88);
-  transition: opacity 240ms ease, transform 240ms ease;
+  transition: opacity 350ms ease, transform 350ms ease;
   will-change: opacity, transform;
 }
 
@@ -1511,7 +1511,22 @@ html, body {
 }
 
 
-  </style>
+  /* Prevent the welcome scene from becoming visible during the gallery-to-date handoff. */
+.theater.date-mode .stage .welcome,
+.theater.date-mode #welcome-flowers,
+.theater.date-mode .stage .spotlight {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: none !important;
+}
+
+/* Keep the stage itself from flashing through while the date reveal is shown. */
+.theater.date-mode .stage {
+  visibility: hidden !important;
+}
+
+</style>
 </head>
 <body>
   <main class="theater" id="theater">
@@ -1591,8 +1606,8 @@ const galleryGrid = document.getElementById("galleryGrid");
 
 const CURTAIN_DURATION = 4500;
 const INTRO_DURATION = 4500;
-const GALLERY_STAGGER_INTERVAL = 28;
-const GALLERY_POPUP_DURATION = 240;
+const GALLERY_STAGGER_INTERVAL = 50;
+const GALLERY_POPUP_DURATION = 350;
 const GALLERY_HOLD_AFTER_REVEAL = 8500;
 const GALLERY_EXIT_DURATION = 650;
 const TOTAL_DURATION = 30000;
