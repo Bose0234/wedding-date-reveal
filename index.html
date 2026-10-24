@@ -289,8 +289,8 @@ body {
     inset 0 0 60px rgba(54, 0, 15, 0.22);
   will-change: transform;
   transition:
-    transform 15.25s cubic-bezier(0.65, 0, 0.35, 1),
-    filter 15.25s ease;
+    transform 4.5s cubic-bezier(0.65, 0, 0.35, 1),
+    filter 4.5s ease;
 }
 
 .curtain.left {
@@ -1429,91 +1429,70 @@ html, body {
 
 
 /* ================================
-   Wedding Photo Gallery
+   Full-screen Wedding Photo Gallery
 ================================ */
-
 .photo-gallery {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(12px, 2vh, 22px);
-  padding: 24px;
-  overflow: auto;
-  background:
-    radial-gradient(ellipse at center, #fffdf7 0%, #fff0e8 65%, #f5d5c8 100%);
+  z-index: 100;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  padding: 0;
+  overflow: hidden;
+  background: #fff1e6;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.75s ease, visibility 0.75s ease;
+  transition: opacity 650ms ease, visibility 0s linear 650ms;
+}
+
+/* The 64 tiles are children of galleryGrid, not photoGallery.
+   Put the 8×8 grid on the element that actually contains the tiles. */
+.gallery-grid {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr));
+  grid-auto-flow: row;
+  gap: 2px;
+  padding: 2px;
+  box-sizing: border-box;
 }
 
 .photo-gallery.is-active {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
+  transition: opacity 450ms ease, visibility 0s;
 }
 
 .photo-gallery.is-leaving {
   opacity: 0;
   visibility: visible;
   pointer-events: none;
-}
-
-.gallery-heading {
-  flex-shrink: 0;
-  text-align: center;
-  color: #8d1831;
-}
-
-.gallery-heading p {
-  margin: 0 0 6px;
-  font-size: 10px;
-  letter-spacing: 4px;
-}
-
-.gallery-heading h2 {
-  margin: 0;
-  font-family: Georgia, serif;
-  font-size: clamp(26px, 4vw, 44px);
-  font-weight: normal;
-}
-
-.gallery-heading span {
-  display: block;
-  margin-top: 7px;
-  color: #76535a;
-  font-size: 12px;
-}
-
-.gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: clamp(4px, 0.8vw, 10px);
-  width: min(100%, 1000px);
+  transition: opacity 650ms ease, visibility 0s;
 }
 
 .gallery-tile {
   position: relative;
-  aspect-ratio: 1 / 1;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 1px;
   background: #ead3c9;
-  box-shadow: 0 3px 10px rgba(100, 35, 45, 0.12);
+  box-shadow: 0 2px 7px rgba(100, 35, 45, 0.12);
   opacity: 0;
-  transform: scale(0.78) translateY(8px);
-  transition:
-    opacity 280ms ease,
-    transform 280ms ease;
+  transform: scale(0.88);
+  transition: opacity 240ms ease, transform 240ms ease;
+  will-change: opacity, transform;
 }
 
 .gallery-tile.is-visible {
   opacity: 1;
-  transform: scale(1) translateY(0);
+  transform: scale(1);
 }
 
 .gallery-tile img {
@@ -1524,29 +1503,11 @@ html, body {
 }
 
 @media (max-width: 600px) {
-  .photo-gallery {
-    gap: 14px;
-    padding: 18px 10px;
-  }
-
-  .gallery-heading p {
-    font-size: 8px;
-    letter-spacing: 3px;
-  }
-
-  .gallery-heading span {
-    font-size: 10px;
-  }
-
   .gallery-grid {
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-    gap: 3px;
+    gap: 1px;
+    padding: 1px;
   }
-
-  .gallery-tile {
-    border-width: 1px;
-    border-radius: 2px;
-  }
+  .gallery-tile { border-width: 0; border-radius: 0; }
 }
 
 
@@ -1563,16 +1524,6 @@ html, body {
   <span class="start-subtitle">A beautiful beginning awaits</span>
 </button>
     <div class="stage">
-      <!-- Wedding Photo Gallery -->
-<section id="photoGallery" class="photo-gallery" aria-label="Wedding photo gallery">
-  <div class="gallery-heading">
-    <p>OUR MEMORIES</p>
-    <h2>A Journey of Love</h2>
-    <span>Every picture tells a little story.</span>
-  </div>
-
-  <div class="gallery-grid" id="galleryGrid"></div>
-</section>
         <canvas id="welcome-flowers" aria-hidden="true"></canvas>
       <div class="spotlight"></div>
 
@@ -1586,7 +1537,11 @@ html, body {
       <div class="floor"></div>
     </div>
 
-    
+    <!-- Wedding Photo Gallery -->
+    <section id="photoGallery" class="photo-gallery" aria-label="Wedding photo gallery">
+      <div class="gallery-grid" id="galleryGrid"></div>
+    </section>
+
 <canvas id="fireworks" aria-hidden="true"></canvas>
 
 
@@ -1634,117 +1589,85 @@ const canvas = document.getElementById("fireworks");
 const photoGallery = document.getElementById("photoGallery");
 const galleryGrid = document.getElementById("galleryGrid");
 
-const GALLERY_MIN_DURATION = 5200;
-const GALLERY_MAX_DURATION = 7000;
-const GALLERY_POPUP_DURATION = 280;
-const GALLERY_EXIT_DURATION = 750;
+const CURTAIN_DURATION = 4500;
+const INTRO_DURATION = 4500;
+const GALLERY_STAGGER_INTERVAL = 28;
+const GALLERY_POPUP_DURATION = 240;
+const GALLERY_HOLD_AFTER_REVEAL = 8500;
+const GALLERY_EXIT_DURATION = 650;
+const TOTAL_DURATION = 30000;
 
 let galleryStarted = false;
 let dateHasStarted = false;
 let galleryTimer = null;
+let galleryRevealTimers = [];
 
 const galleryImages = Array.from({ length: 64 }, (_, index) => {
   const number = String(index + 1).padStart(2, "0");
-
   return `./Assets/gallery/photo-${number}.jpg`;
 });
-
-/* Create the 64 gallery tiles once */
 
 const galleryTiles = galleryImages.map((src, index) => {
   const tile = document.createElement("div");
   tile.className = "gallery-tile";
-
   const img = document.createElement("img");
   img.src = src;
   img.alt = `Wedding memory ${index + 1}`;
   img.loading = "eager";
   img.decoding = "async";
-
   tile.appendChild(img);
   galleryGrid.appendChild(tile);
-
   return { tile, img };
 });
 
-/* Preload and decode the gallery photos */
-
-async function preloadGalleryImages() {
-  await Promise.all(
-    galleryTiles.map(async ({ img }) => {
-      try {
-        if (!img.complete) {
-          await new Promise((resolve) => {
-            img.addEventListener("load", resolve, { once: true });
-            img.addEventListener("error", resolve, { once: true });
-          });
-        }
-
-        if (img.naturalWidth > 0 && img.decode) {
-          await img.decode().catch(() => {});
-        }
-      } catch (error) {
-        console.warn("Could not load gallery image:", img.src);
-      }
-    })
-  );
+// Start fetching all photos early; image loading never blocks the timeline.
+function preloadGalleryImages() {
+  galleryTiles.forEach(({ img }) => {
+    if (img.complete && img.naturalWidth > 0 && img.decode) {
+      img.decode().catch(() => {});
+    }
+  });
 }
 
-/* Reveal tiles one after another */
-
-async function revealGallery() {
+function revealGallery() {
   if (galleryStarted || dateHasStarted) return;
-
   galleryStarted = true;
+  photoGallery.classList.remove("is-leaving");
   photoGallery.classList.add("is-active");
-
-  await preloadGalleryImages();
-
-  if (dateHasStarted) return;
-
-  const staggerInterval = 65;
+  preloadGalleryImages();
 
   galleryTiles.forEach(({ tile }, index) => {
-    setTimeout(() => {
-      if (!dateHasStarted) {
-        tile.classList.add("is-visible");
-      }
-    }, index * staggerInterval);
+    const timer = setTimeout(() => {
+      if (!dateHasStarted) tile.classList.add("is-visible");
+    }, index * GALLERY_STAGGER_INTERVAL);
+    galleryRevealTimers.push(timer);
   });
 
-  const revealDuration =
-    (galleryTiles.length - 1) * staggerInterval +
-    GALLERY_POPUP_DURATION;
-
-  const galleryDuration = Math.max(
-    GALLERY_MIN_DURATION,
-    Math.min(GALLERY_MAX_DURATION, revealDuration + 500)
-  );
-
-  galleryTimer = setTimeout(showDateReveal, galleryDuration);
+  const revealDuration = (galleryTiles.length - 1) * GALLERY_STAGGER_INTERVAL + GALLERY_POPUP_DURATION;
+  galleryTimer = setTimeout(showDateReveal, revealDuration + GALLERY_HOLD_AFTER_REVEAL);
 }
-
-/* Fade the gallery out, then show the existing date reveal */
 
 function showDateReveal() {
   if (dateHasStarted) return;
-
   dateHasStarted = true;
   clearTimeout(galleryTimer);
+  galleryRevealTimers.forEach(clearTimeout);
+  galleryRevealTimers = [];
 
+  // Hide the welcome scene BEFORE the gallery starts fading. The gallery
+  // remains above the stage during the fade, so date-mode can be activated
+  // immediately without exposing the welcome screen underneath it.
+  theater.classList.add("date-mode");
+  photoGallery.style.visibility = "visible";
   photoGallery.classList.remove("is-active");
   photoGallery.classList.add("is-leaving");
 
+  startFireworks();
+  if (!flowerActive) startFlowers();
+
   setTimeout(() => {
-    theater.classList.add("date-mode");
-
-    if (typeof startFireworks === "function") {
-      startFireworks();
-    }
-
-    if (typeof startFlowerSprinkle === "function") {
-      startFlowerSprinkle();
-    }
+    photoGallery.classList.remove("is-leaving");
+    photoGallery.style.visibility = "hidden";
   }, GALLERY_EXIT_DURATION);
 }
 
@@ -1758,10 +1681,6 @@ const welcomeFlowerCtx = welcomeFlowerCanvas
   ? welcomeFlowerCanvas.getContext("2d")
   : null;
 
-const TOTAL_DURATION = 61000;
-const CURTAIN_DURATION = TOTAL_DURATION * 0.25;
-const INTRO_DURATION = TOTAL_DURATION * 0.25;
-const DATE_DURATION = TOTAL_DURATION * 0.50;
 
 let animationTimers = [];
 let animationStartTime = 0;
@@ -2089,36 +2008,28 @@ function stopFlowers() {
 
 function startWeddingAnimation() {
   if (animationRunning) return;
-
   animationRunning = true;
-  animationStartTime = performance.now();
-
   clearAnimationTimers();
   stopFireworks();
   stopFlowers();
-
+  galleryStarted = false;
+  dateHasStarted = false;
+  clearTimeout(galleryTimer);
+  galleryRevealTimers.forEach(clearTimeout);
+  galleryRevealTimers = [];
+  photoGallery.style.visibility = "";
+  photoGallery.classList.remove("is-active", "is-leaving");
+  galleryTiles.forEach(({ tile }) => tile.classList.remove("is-visible"));
   theater.classList.remove("open", "date-mode");
-
   resizeAllCanvases();
-
-  // Start the floral shower behind the welcome screen as the curtains open.
   startFlowers();
 
-  // Stage 1: Curtains open, 0–15.25 seconds.
-  requestAnimationFrame(() => {
-    theater.classList.add("open");
-  });
+  // Curtains open in 4.5s. Welcome remains for another 4.5s, then the
+  // full-screen gallery runs, followed by a permanent date reveal.
+  requestAnimationFrame(() => theater.classList.add("open"));
+  scheduleAnimation(revealGallery, CURTAIN_DURATION + INTRO_DURATION);
 
-  // Stage 2: Welcome intro, 15.25–30.5 seconds.
-  // The floral shower continues behind the welcome content.
-
-  // Stage 3: Wedding date, fireworks and continuing flower shower.
-  scheduleAnimation(() => {
-    theater.classList.add("date-mode");
-    startFireworks();
-  }, CURTAIN_DURATION + INTRO_DURATION);
-
-  // At 61 seconds, stop effects but keep the final date visible.
+  // Stop the animation effects later, but never hide the final date screen.
   scheduleAnimation(() => {
     stopFireworks();
     stopFlowers();
